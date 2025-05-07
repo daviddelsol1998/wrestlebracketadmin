@@ -11,7 +11,8 @@ import { useCallback, useState, useEffect } from "react";
 import { useDropzone } from "react-dropzone";
 import CreatableSelect from "react-select/creatable";
 import type { MultiValue } from "react-select";
-import { getWrestlers, createWrestler, updateWrestler, deleteWrestler, uploadWrestlerImage, Wrestler, OptionType } from "@/lib/wrestlers";
+import { fetchWrestlersWithPromotions, createWrestlerWithPromotions, updateWrestlerWithPromotions, deleteWrestler, uploadWrestlerImage, Wrestler, OptionType, PromotionRef } from "@/lib/wrestlers";
+import { getPromotionsWithWrestlerCount, createPromotion, updatePromotion, deletePromotion, uploadPromotionImage, Promotion } from "@/lib/promotions";
 
 function WrestlerImageDropzone({ value, onChange }: { value?: File | null; onChange: (file: File | null) => void }) {
   const onDrop = useCallback((acceptedFiles: File[]) => {
@@ -81,6 +82,15 @@ function ChampionshipImageDropzone({ value, onChange }: { value?: File | null; o
   );
 }
 
+// Helper to convert PromotionRef[] to OptionType[]
+function promotionRefsToOptions(promos: { id: string; name: string }[] = []): OptionType[] {
+  return promos.map(p => ({ value: p.id, label: p.name }));
+}
+// Helper to convert OptionType[] to string[] (promotion ids)
+function optionsToPromotionIds(options: OptionType[]): string[] {
+  return options.map(o => o.value);
+}
+
 export default function Home() {
   const [open, setOpen] = useState(false);
   const [image, setImage] = useState<File | null>(null);
@@ -104,12 +114,18 @@ export default function Home() {
   const [editPromoOpen, setEditPromoOpen] = useState(false);
   const [editPromoName, setEditPromoName] = useState("");
   const [editPromoImage, setEditPromoImage] = useState<File | null>(null);
-  // Mock promotions data
-  const mockPromotions = [
-    { id: 1, name: "WWE", image: "https://placehold.co/80x80/png" },
-    { id: 2, name: "AEW", image: "https://placehold.co/80x80/png" },
-    { id: 3, name: "NJPW", image: "https://placehold.co/80x80/png" },
-  ];
+  // Promotions state
+  const [promotionsList, setPromotionsList] = useState<Promotion[]>([]);
+  const [promotionsLoading, setPromotionsLoading] = useState(true);
+  const [promotionsError, setPromotionsError] = useState<string | null>(null);
+  // Create modal state
+  const [newPromotionName, setNewPromotionName] = useState("");
+  const [createPromotionLoading, setCreatePromotionLoading] = useState(false);
+  // Edit modal state
+  const [editPromotionId, setEditPromotionId] = useState<string | null>(null);
+  const [editPromotionLoading, setEditPromotionLoading] = useState(false);
+  // Delete state
+  const [deletePromotionId, setDeletePromotionId] = useState<string | null>(null);
 
   // Edit Faction modal state
   const [editFactionOpen, setEditFactionOpen] = useState(false);
@@ -149,7 +165,7 @@ export default function Home() {
   const [wrestlers, setWrestlers] = useState<Wrestler[]>([]);
   const [wrestlersLoading, setWrestlersLoading] = useState(true);
   const [wrestlersError, setWrestlersError] = useState<string | null>(null);
-  // Create modal state
+  // Create modal state for Wrestlers
   const [newWrestlerName, setNewWrestlerName] = useState("");
   const [createLoading, setCreateLoading] = useState(false);
   // Edit modal state
@@ -215,28 +231,34 @@ export default function Home() {
   // Fetch wrestlers on mount
   useEffect(() => {
     setWrestlersLoading(true);
-    getWrestlers()
-      .then(setWrestlers)
+    fetchWrestlersWithPromotions()
+      .then((ws: Wrestler[]) => setWrestlers(ws))
       .catch((e: unknown) => setWrestlersError((e as Error).message))
       .finally(() => setWrestlersLoading(false));
+  }, []);
+
+  // Fetch promotions on mount
+  useEffect(() => {
+    setPromotionsLoading(true);
+    getPromotionsWithWrestlerCount()
+      .then(setPromotionsList)
+      .catch((e: unknown) => setPromotionsError((e as Error).message))
+      .finally(() => setPromotionsLoading(false));
   }, []);
 
   // Create wrestler handler
   async function handleCreateWrestler(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setCreateLoading(true);
-    console.log("Creating wrestler:", { newWrestlerName, image, promotions, factions, championships });
     try {
       let imageUrl: string | undefined = undefined;
       if (image) {
         imageUrl = await uploadWrestlerImage(image);
       }
-      const wrestler = await createWrestler({
+      const wrestler = await createWrestlerWithPromotions({
         name: newWrestlerName,
         image_url: imageUrl,
-        promotions,
-        factions,
-        championships,
+        promotions: optionsToPromotionIds(promotions),
       });
       setWrestlers([wrestler, ...wrestlers]);
       setOpen(false);
@@ -245,6 +267,7 @@ export default function Home() {
       setPromotions([]);
       setFactions([]);
       setChampionships([]);
+      await getPromotionsWithWrestlerCount().then(setPromotionsList);
     } catch (e: unknown) {
       console.error("Error creating wrestler:", e);
       alert("Error creating wrestler: " + (e as Error).message);
@@ -271,21 +294,20 @@ export default function Home() {
       if (editWrestlerImage) {
         imageUrl = await uploadWrestlerImage(editWrestlerImage);
       }
-      const wrestler = await updateWrestler(editWrestlerId, {
+      const wrestler = await updateWrestlerWithPromotions(editWrestlerId, {
         name: editWrestlerName,
         image_url: imageUrl,
-        promotions: editWrestlerPromotions,
-        factions: editWrestlerFactions,
-        championships: editWrestlerChampionships,
+        promotions: optionsToPromotionIds(editWrestlerPromotions),
       });
       setWrestlers(wrestlers => wrestlers.map(w => w.id === wrestler.id ? wrestler : w));
       setEditWrestlerOpen(false);
       setEditWrestlerId(null);
       setEditWrestlerName("");
       setEditWrestlerImage(null);
-      setEditWrestlerPromotions([]);
-      setEditWrestlerFactions([]);
-      setEditWrestlerChampionships([]);
+      setEditWrestlerPromotions(promotionRefsToOptions(wrestler.promotions ?? []));
+      setEditWrestlerFactions(wrestler.factions ?? []);
+      setEditWrestlerChampionships(wrestler.championships ?? []);
+      await getPromotionsWithWrestlerCount().then(setPromotionsList);
     } catch (e: unknown) {
       console.error("Error updating wrestler:", e);
       alert("Error updating wrestler: " + (e as Error).message);
@@ -304,11 +326,103 @@ export default function Home() {
       setDeleteWrestlerId(null);
       setDeleteEntityType(null);
       setDeleteEntityName("");
+      await getPromotionsWithWrestlerCount().then(setPromotionsList);
     } catch (e: unknown) {
       console.error("Error deleting wrestler:", e);
       alert("Error deleting wrestler: " + (e as Error).message);
     }
   }
+
+  // Create promotion handler
+  async function handleCreatePromotion(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setCreatePromotionLoading(true);
+    try {
+      let imageUrl: string | undefined = undefined;
+      if (promoImage) {
+        imageUrl = await uploadPromotionImage(promoImage);
+      }
+      const promotion = await createPromotion({
+        name: newPromotionName,
+        image_url: imageUrl,
+      });
+      setPromotionsList([promotion, ...promotionsList]);
+      setPromoOpen(false);
+      setNewPromotionName("");
+      setPromoImage(null);
+      await getPromotionsWithWrestlerCount().then(setPromotionsList);
+    } catch (e: unknown) {
+      alert("Error creating promotion: " + (e as Error).message);
+    } finally {
+      setCreatePromotionLoading(false);
+    }
+  }
+
+  // Edit promotion handler
+  async function handleEditPromotion(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (!editPromotionId) return;
+    setEditPromotionLoading(true);
+    try {
+      let imageUrl: string | undefined = undefined;
+      if (editPromoImage) {
+        imageUrl = await uploadPromotionImage(editPromoImage);
+      }
+      const promotion = await updatePromotion(editPromotionId, {
+        name: editPromoName,
+        image_url: imageUrl,
+      });
+      setPromotionsList(list => list.map(p => p.id === promotion.id ? promotion : p));
+      setEditPromoOpen(false);
+      setEditPromotionId(null);
+      setEditPromoName("");
+      setEditPromoImage(null);
+      await getPromotionsWithWrestlerCount().then(setPromotionsList);
+    } catch (e: unknown) {
+      alert("Error updating promotion: " + (e as Error).message);
+    } finally {
+      setEditPromotionLoading(false);
+    }
+  }
+
+  // Delete promotion handler
+  async function handleDeletePromotion(): Promise<void> {
+    if (!deletePromotionId) return;
+    try {
+      await deletePromotion(deletePromotionId);
+      setPromotionsList(list => list.filter(p => p.id !== deletePromotionId));
+      setDeletePromotionId(null);
+      setDeleteEntityType(null);
+      setDeleteEntityName("");
+      await getPromotionsWithWrestlerCount().then(setPromotionsList);
+      // Refetch wrestlers so their promotions update in the UI
+      await fetchWrestlersWithPromotions().then(setWrestlers);
+    } catch (e: unknown) {
+      alert("Error deleting promotion: " + (e as Error).message);
+    }
+  }
+
+  const handleCreatePromotionOption = async (inputValue: string) => {
+    try {
+      const newPromotion = await createPromotion({ name: inputValue, image_url: null });
+      setPromotionsList(prev => [{ ...newPromotion }, ...prev]);
+      setPromotions(prev => [...prev, { value: newPromotion.id, label: newPromotion.name }]);
+      await getPromotionsWithWrestlerCount().then(setPromotionsList);
+    } catch (e) {
+      alert("Error creating promotion: " + (e as Error).message);
+    }
+  };
+
+  const handleEditCreatePromotionOption = async (inputValue: string) => {
+    try {
+      const newPromotion = await createPromotion({ name: inputValue, image_url: null });
+      setPromotionsList(prev => [{ ...newPromotion }, ...prev]);
+      setEditWrestlerPromotions(prev => [...prev, { value: newPromotion.id, label: newPromotion.name }]);
+      await getPromotionsWithWrestlerCount().then(setPromotionsList);
+    } catch (e) {
+      alert("Error creating promotion: " + (e as Error).message);
+    }
+  };
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -393,19 +507,18 @@ export default function Home() {
                     value={newWrestlerName}
                     onChange={e => setNewWrestlerName(e.target.value)}
                   />
+                  <label className="text-sm font-medium mb-1">Promotion(s)</label>
                   <CreatableSelect
                     isMulti
                     styles={selectStyles}
                     classNamePrefix="react-select"
-                    placeholder="Promotions"
+                    placeholder="Select or create a promotion..."
                     value={promotions}
                     onChange={(newValue: MultiValue<OptionType>) => setPromotions(newValue as OptionType[])}
-                    options={[
-                      { value: "wwe", label: "WWE" },
-                      { value: "aew", label: "AEW" },
-                      { value: "njpw", label: "NJPW" },
-                    ]}
+                    options={promotionsList.map(p => ({ value: p.id, label: p.name }))}
+                    onCreateOption={handleCreatePromotionOption}
                   />
+                  <label className="text-sm font-medium mb-1">Faction(s)</label>
                   <CreatableSelect
                     isMulti
                     styles={selectStyles}
@@ -419,6 +532,7 @@ export default function Home() {
                       { value: "chaos", label: "CHAOS" },
                     ]}
                   />
+                  <label className="text-sm font-medium mb-1">Championship(s)</label>
                   <CreatableSelect
                     isMulti
                     styles={selectStyles}
@@ -453,8 +567,10 @@ export default function Home() {
                     <div>
                       <CardTitle className="text-card-foreground">{wrestler.name}</CardTitle>
                       <div className="flex flex-wrap gap-1 mt-1">
-                        {(wrestler.promotions ?? []).map((p) => (
-                          <span key={p.value} className="bg-primary/20 text-primary-foreground px-2 py-0.5 rounded text-xs border border-primary/30">{p.label}</span>
+                        {(wrestler.promotions ?? []).map((p: PromotionRef) => (
+                          <span key={p.id} className="bg-primary/20 text-primary-foreground px-2 py-0.5 rounded text-xs border border-primary/30">
+                            {p.name}
+                          </span>
                         ))}
                         {(wrestler.factions ?? []).map((f) => (
                           <span key={f.value} className="bg-secondary/20 text-secondary-foreground px-2 py-0.5 rounded text-xs border border-secondary/30">{f.label}</span>
@@ -471,7 +587,7 @@ export default function Home() {
                         onClick={() => {
                           setEditWrestlerName(wrestler.name);
                           setEditWrestlerImage(null);
-                          setEditWrestlerPromotions(wrestler.promotions ?? []);
+                          setEditWrestlerPromotions(promotionRefsToOptions(wrestler.promotions ?? []));
                           setEditWrestlerFactions(wrestler.factions ?? []);
                           setEditWrestlerChampionships(wrestler.championships ?? []);
                           setEditWrestlerId(wrestler.id);
@@ -513,27 +629,43 @@ export default function Home() {
                 <DialogHeader>
                   <DialogTitle>Create New Promotion</DialogTitle>
                 </DialogHeader>
-                <form className="flex flex-col gap-4 mt-2 w-full">
+                <form className="flex flex-col gap-4 mt-2 w-full" onSubmit={handleCreatePromotion}>
                   <PromotionImageDropzone value={promoImage} onChange={setPromoImage} />
-                  <Input placeholder="Name" className="w-full" value={promoName} onChange={e => setPromoName(e.target.value)} />
+                  <Input
+                    placeholder="Name"
+                    className="w-full"
+                    value={newPromotionName}
+                    onChange={e => setNewPromotionName(e.target.value)}
+                  />
                   <DialogFooter>
                     <Button type="button" variant="outline" onClick={() => setPromoOpen(false)}>Cancel</Button>
-                    <Button type="submit">Save</Button>
+                    <Button type="submit" disabled={createPromotionLoading}>
+                      {createPromotionLoading ? "Saving..." : "Save"}
+                    </Button>
                   </DialogFooter>
                 </form>
               </DialogContent>
             </Dialog>
+            {promotionsLoading && (
+              <div className="text-center text-muted-foreground py-12">Loading promotions...</div>
+            )}
+            {promotionsError && (
+              <div className="text-center text-destructive py-4">{promotionsError}</div>
+            )}
             <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-              {mockPromotions.map((promo) => (
+              {promotionsList.map((promo) => (
                 <Card key={promo.id}>
                   <CardHeader className="flex flex-row items-center gap-4">
                     <img
-                      src={promo.image}
+                      src={promo.image_url || "https://placehold.co/80x80/png"}
                       alt={promo.name}
                       className="w-20 h-20 rounded-full object-cover border"
                     />
                     <div>
                       <CardTitle>{promo.name}</CardTitle>
+                      <div className="text-xs text-muted-foreground mt-1">
+                        {promo.wrestler_count ?? 0} wrestler{(promo.wrestler_count ?? 0) === 1 ? "" : "s"} associated
+                      </div>
                     </div>
                   </CardHeader>
                   <CardContent>
@@ -542,12 +674,14 @@ export default function Home() {
                         onClick={() => {
                           setEditPromoName(promo.name);
                           setEditPromoImage(null);
+                          setEditPromotionId(promo.id);
                           setEditPromoOpen(true);
                         }}>
                         Edit
                       </Button>
                       <Button size="sm" variant="destructive"
                         onClick={() => {
+                          setDeletePromotionId(promo.id);
                           setDeleteEntityType("Promotion");
                           setDeleteEntityName(promo.name);
                           setDeleteDialogOpen(true);
@@ -565,12 +699,19 @@ export default function Home() {
                 <DialogHeader>
                   <DialogTitle>Edit Promotion</DialogTitle>
                 </DialogHeader>
-                <form className="flex flex-col gap-4 mt-2 w-full">
+                <form className="flex flex-col gap-4 mt-2 w-full" onSubmit={handleEditPromotion}>
                   <PromotionImageDropzone value={editPromoImage} onChange={setEditPromoImage} />
-                  <Input placeholder="Name" className="w-full" value={editPromoName} onChange={e => setEditPromoName(e.target.value)} />
+                  <Input
+                    placeholder="Name"
+                    className="w-full"
+                    value={editPromoName}
+                    onChange={e => setEditPromoName(e.target.value)}
+                  />
                   <DialogFooter>
                     <Button type="button" variant="outline" onClick={() => setEditPromoOpen(false)}>Cancel</Button>
-                    <Button type="submit">Save</Button>
+                    <Button type="submit" disabled={editPromotionLoading}>
+                      {editPromotionLoading ? "Saving..." : "Save"}
+                    </Button>
                   </DialogFooter>
                 </form>
               </DialogContent>
@@ -754,10 +895,16 @@ export default function Home() {
             <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
             <Button
               variant="destructive"
-              disabled={deleteEntityType === 'Wrestler' && !deleteWrestlerId}
+              disabled={
+                (deleteEntityType === 'Wrestler' && !deleteWrestlerId) ||
+                (deleteEntityType === 'Promotion' && !deletePromotionId)
+              }
               onClick={async () => {
                 if (deleteEntityType === 'Wrestler' && deleteWrestlerId) {
                   await handleDeleteWrestler();
+                }
+                if (deleteEntityType === 'Promotion' && deletePromotionId) {
+                  await handleDeletePromotion();
                 }
                 setDeleteDialogOpen(false);
               }}
@@ -781,19 +928,18 @@ export default function Home() {
               value={editWrestlerName}
               onChange={e => setEditWrestlerName(e.target.value)}
             />
+            <label className="text-sm font-medium mb-1">Promotion(s)</label>
             <CreatableSelect
               isMulti
               styles={selectStyles}
               classNamePrefix="react-select"
-              placeholder="Promotions"
+              placeholder="Select or create a promotion..."
               value={editWrestlerPromotions}
               onChange={(newValue: MultiValue<OptionType>) => setEditWrestlerPromotions(newValue as OptionType[])}
-              options={[
-                { value: "wwe", label: "WWE" },
-                { value: "aew", label: "AEW" },
-                { value: "njpw", label: "NJPW" },
-              ]}
+              options={promotionsList.map(p => ({ value: p.id, label: p.name }))}
+              onCreateOption={handleEditCreatePromotionOption}
             />
+            <label className="text-sm font-medium mb-1">Faction(s)</label>
             <CreatableSelect
               isMulti
               styles={selectStyles}
@@ -807,6 +953,7 @@ export default function Home() {
                 { value: "chaos", label: "CHAOS" },
               ]}
             />
+            <label className="text-sm font-medium mb-1">Championship(s)</label>
             <CreatableSelect
               isMulti
               styles={selectStyles}
