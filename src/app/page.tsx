@@ -11,8 +11,7 @@ import { useCallback, useState, useEffect } from "react";
 import { useDropzone } from "react-dropzone";
 import CreatableSelect from "react-select/creatable";
 import type { MultiValue } from "react-select";
-
-type OptionType = { value: string; label: string };
+import { getWrestlers, createWrestler, updateWrestler, deleteWrestler, uploadWrestlerImage, Wrestler, OptionType } from "@/lib/wrestlers";
 
 function WrestlerImageDropzone({ value, onChange }: { value?: File | null; onChange: (file: File | null) => void }) {
   const onDrop = useCallback((acceptedFiles: File[]) => {
@@ -146,33 +145,18 @@ export default function Home() {
   const [editWrestlerPromotions, setEditWrestlerPromotions] = useState<OptionType[]>([]);
   const [editWrestlerFactions, setEditWrestlerFactions] = useState<OptionType[]>([]);
   const [editWrestlerChampionships, setEditWrestlerChampionships] = useState<OptionType[]>([]);
-  // Mock wrestlers data
-  const mockWrestlers = [
-    {
-      id: 1,
-      name: "Kazuchika Okada",
-      image: "https://placehold.co/80x80/png",
-      promotions: [{ value: "njpw", label: "NJPW" }],
-      factions: [{ value: "chaos", label: "CHAOS" }],
-      championships: [{ value: "world", label: "World Championship" }],
-    },
-    {
-      id: 2,
-      name: "Roman Reigns",
-      image: "https://placehold.co/80x80/png",
-      promotions: [{ value: "wwe", label: "WWE" }],
-      factions: [{ value: "bloodline", label: "The Bloodline" }],
-      championships: [{ value: "world", label: "World Championship" }],
-    },
-    {
-      id: 3,
-      name: "Kenny Omega",
-      image: "https://placehold.co/80x80/png",
-      promotions: [{ value: "aew", label: "AEW" }],
-      factions: [{ value: "bulletclub", label: "Bullet Club" }],
-      championships: [{ value: "tag", label: "Tag Team Championship" }],
-    },
-  ];
+  // Wrestlers state
+  const [wrestlers, setWrestlers] = useState<Wrestler[]>([]);
+  const [wrestlersLoading, setWrestlersLoading] = useState(true);
+  const [wrestlersError, setWrestlersError] = useState<string | null>(null);
+  // Create modal state
+  const [newWrestlerName, setNewWrestlerName] = useState("");
+  const [createLoading, setCreateLoading] = useState(false);
+  // Edit modal state
+  const [editWrestlerId, setEditWrestlerId] = useState<string | null>(null);
+  const [editLoading, setEditLoading] = useState(false);
+  // Delete state
+  const [deleteWrestlerId, setDeleteWrestlerId] = useState<string | null>(null);
 
   // Supabase color palette for select dropdowns
   const [isDark, setIsDark] = useState(false);
@@ -228,6 +212,104 @@ export default function Home() {
     placeholder: (base: any) => ({ ...base, color: isDark ? '#a1a1aa' : '#6b7280' }),
   };
 
+  // Fetch wrestlers on mount
+  useEffect(() => {
+    setWrestlersLoading(true);
+    getWrestlers()
+      .then(setWrestlers)
+      .catch((e: unknown) => setWrestlersError((e as Error).message))
+      .finally(() => setWrestlersLoading(false));
+  }, []);
+
+  // Create wrestler handler
+  async function handleCreateWrestler(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setCreateLoading(true);
+    console.log("Creating wrestler:", { newWrestlerName, image, promotions, factions, championships });
+    try {
+      let imageUrl: string | undefined = undefined;
+      if (image) {
+        imageUrl = await uploadWrestlerImage(image);
+      }
+      const wrestler = await createWrestler({
+        name: newWrestlerName,
+        image_url: imageUrl,
+        promotions,
+        factions,
+        championships,
+      });
+      setWrestlers([wrestler, ...wrestlers]);
+      setOpen(false);
+      setNewWrestlerName("");
+      setImage(null);
+      setPromotions([]);
+      setFactions([]);
+      setChampionships([]);
+    } catch (e: unknown) {
+      console.error("Error creating wrestler:", e);
+      alert("Error creating wrestler: " + (e as Error).message);
+    } finally {
+      setCreateLoading(false);
+    }
+  }
+
+  // Edit wrestler handler
+  async function handleEditWrestler(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (!editWrestlerId) return;
+    setEditLoading(true);
+    console.log("Editing wrestler:", {
+      id: editWrestlerId,
+      name: editWrestlerName,
+      image: editWrestlerImage,
+      promotions: editWrestlerPromotions,
+      factions: editWrestlerFactions,
+      championships: editWrestlerChampionships,
+    });
+    try {
+      let imageUrl: string | undefined = undefined;
+      if (editWrestlerImage) {
+        imageUrl = await uploadWrestlerImage(editWrestlerImage);
+      }
+      const wrestler = await updateWrestler(editWrestlerId, {
+        name: editWrestlerName,
+        image_url: imageUrl,
+        promotions: editWrestlerPromotions,
+        factions: editWrestlerFactions,
+        championships: editWrestlerChampionships,
+      });
+      setWrestlers(wrestlers => wrestlers.map(w => w.id === wrestler.id ? wrestler : w));
+      setEditWrestlerOpen(false);
+      setEditWrestlerId(null);
+      setEditWrestlerName("");
+      setEditWrestlerImage(null);
+      setEditWrestlerPromotions([]);
+      setEditWrestlerFactions([]);
+      setEditWrestlerChampionships([]);
+    } catch (e: unknown) {
+      console.error("Error updating wrestler:", e);
+      alert("Error updating wrestler: " + (e as Error).message);
+    } finally {
+      setEditLoading(false);
+    }
+  }
+
+  // Delete wrestler handler
+  async function handleDeleteWrestler(): Promise<void> {
+    if (!deleteWrestlerId) return;
+    console.log("Deleting wrestler with id:", deleteWrestlerId);
+    try {
+      await deleteWrestler(deleteWrestlerId);
+      setWrestlers(wrestlers => wrestlers.filter(w => w.id !== deleteWrestlerId));
+      setDeleteWrestlerId(null);
+      setDeleteEntityType(null);
+      setDeleteEntityName("");
+    } catch (e: unknown) {
+      console.error("Error deleting wrestler:", e);
+      alert("Error deleting wrestler: " + (e as Error).message);
+    }
+  }
+
   return (
     <div className="min-h-screen flex flex-col">
       {/* Header */}
@@ -248,6 +330,12 @@ export default function Home() {
             <TabsTrigger value="championships">Championships</TabsTrigger>
           </TabsList>
           <TabsContent value="wrestlers">
+            {wrestlersLoading && (
+              <div className="text-center text-muted-foreground py-12">Loading wrestlers...</div>
+            )}
+            {wrestlersError && (
+              <div className="text-center text-destructive py-4">{wrestlersError}</div>
+            )}
             <div className="flex flex-col gap-4 mb-8 md:flex-row md:items-end md:gap-6">
               <div className="flex-1">
                 <Input placeholder="Search wrestlers by name..." className="w-full" />
@@ -297,9 +385,14 @@ export default function Home() {
                 <DialogHeader>
                   <DialogTitle>Create New Wrestler</DialogTitle>
                 </DialogHeader>
-                <form className="flex flex-col gap-4 mt-2 w-full">
+                <form className="flex flex-col gap-4 mt-2 w-full" onSubmit={handleCreateWrestler}>
                   <WrestlerImageDropzone value={image} onChange={setImage} />
-                  <Input placeholder="Name" className="w-full" />
+                  <Input
+                    placeholder="Name"
+                    className="w-full"
+                    value={newWrestlerName}
+                    onChange={e => setNewWrestlerName(e.target.value)}
+                  />
                   <CreatableSelect
                     isMulti
                     styles={selectStyles}
@@ -341,30 +434,32 @@ export default function Home() {
                   />
                   <DialogFooter>
                     <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-                    <Button type="submit">Save</Button>
+                    <Button type="submit" disabled={createLoading}>
+                      {createLoading ? "Saving..." : "Save"}
+                    </Button>
                   </DialogFooter>
                 </form>
               </DialogContent>
             </Dialog>
             <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-              {mockWrestlers.map((wrestler) => (
+              {wrestlers.map((wrestler) => (
                 <Card key={wrestler.id} className="bg-card text-card-foreground border border-border shadow-sm flex flex-col gap-6 rounded-xl py-6">
                   <CardHeader className="flex flex-row items-center gap-4 px-6">
                     <img
-                      src={wrestler.image}
+                      src={wrestler.image_url || "https://placehold.co/80x80/png"}
                       alt={wrestler.name}
                       className="w-20 h-20 rounded-full object-cover border border-border bg-muted"
                     />
                     <div>
                       <CardTitle className="text-card-foreground">{wrestler.name}</CardTitle>
                       <div className="flex flex-wrap gap-1 mt-1">
-                        {wrestler.promotions.map((p) => (
+                        {(wrestler.promotions ?? []).map((p) => (
                           <span key={p.value} className="bg-primary/20 text-primary-foreground px-2 py-0.5 rounded text-xs border border-primary/30">{p.label}</span>
                         ))}
-                        {wrestler.factions.map((f) => (
+                        {(wrestler.factions ?? []).map((f) => (
                           <span key={f.value} className="bg-secondary/20 text-secondary-foreground px-2 py-0.5 rounded text-xs border border-secondary/30">{f.label}</span>
                         ))}
-                        {wrestler.championships.map((c) => (
+                        {(wrestler.championships ?? []).map((c) => (
                           <span key={c.value} className="bg-accent/20 text-accent-foreground px-2 py-0.5 rounded text-xs border border-accent/30">{c.label}</span>
                         ))}
                       </div>
@@ -376,15 +471,17 @@ export default function Home() {
                         onClick={() => {
                           setEditWrestlerName(wrestler.name);
                           setEditWrestlerImage(null);
-                          setEditWrestlerPromotions(wrestler.promotions);
-                          setEditWrestlerFactions(wrestler.factions);
-                          setEditWrestlerChampionships(wrestler.championships);
+                          setEditWrestlerPromotions(wrestler.promotions ?? []);
+                          setEditWrestlerFactions(wrestler.factions ?? []);
+                          setEditWrestlerChampionships(wrestler.championships ?? []);
+                          setEditWrestlerId(wrestler.id);
                           setEditWrestlerOpen(true);
                         }}>
                         Edit
                       </Button>
                       <Button size="sm" variant="destructive"
                         onClick={() => {
+                          setDeleteWrestlerId(wrestler.id);
                           setDeleteEntityType("Wrestler");
                           setDeleteEntityName(wrestler.name);
                           setDeleteDialogOpen(true);
@@ -655,7 +752,18 @@ export default function Home() {
           <div className="py-4">Are you sure you want to delete <span className="font-semibold">{deleteEntityName}</span>? This action cannot be undone.</div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
-            <Button variant="destructive" onClick={() => setDeleteDialogOpen(false)}>Delete</Button>
+            <Button
+              variant="destructive"
+              disabled={deleteEntityType === 'Wrestler' && !deleteWrestlerId}
+              onClick={async () => {
+                if (deleteEntityType === 'Wrestler' && deleteWrestlerId) {
+                  await handleDeleteWrestler();
+                }
+                setDeleteDialogOpen(false);
+              }}
+            >
+              Delete
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -665,9 +773,14 @@ export default function Home() {
           <DialogHeader>
             <DialogTitle>Edit Wrestler</DialogTitle>
           </DialogHeader>
-          <form className="flex flex-col gap-4 mt-2 w-full">
+          <form className="flex flex-col gap-4 mt-2 w-full" onSubmit={handleEditWrestler}>
             <WrestlerImageDropzone value={editWrestlerImage} onChange={setEditWrestlerImage} />
-            <Input placeholder="Name" className="w-full" value={editWrestlerName} onChange={e => setEditWrestlerName(e.target.value)} />
+            <Input
+              placeholder="Name"
+              className="w-full"
+              value={editWrestlerName}
+              onChange={e => setEditWrestlerName(e.target.value)}
+            />
             <CreatableSelect
               isMulti
               styles={selectStyles}
@@ -709,7 +822,9 @@ export default function Home() {
             />
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setEditWrestlerOpen(false)}>Cancel</Button>
-              <Button type="submit">Save</Button>
+              <Button type="submit" disabled={editLoading}>
+                {editLoading ? "Saving..." : "Save"}
+              </Button>
             </DialogFooter>
           </form>
         </DialogContent>
