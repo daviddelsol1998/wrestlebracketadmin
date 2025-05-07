@@ -348,15 +348,15 @@ export default function Home() {
             </Dialog>
             <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
               {mockWrestlers.map((wrestler) => (
-                <Card key={wrestler.id} className="bg-background border border-border shadow-sm">
-                  <CardHeader className="flex flex-row items-center gap-4">
+                <Card key={wrestler.id} className="bg-card text-card-foreground border border-border shadow-sm flex flex-col gap-6 rounded-xl py-6">
+                  <CardHeader className="flex flex-row items-center gap-4 px-6">
                     <img
                       src={wrestler.image}
                       alt={wrestler.name}
                       className="w-20 h-20 rounded-full object-cover border border-border bg-muted"
                     />
                     <div>
-                      <CardTitle className="text-foreground">{wrestler.name}</CardTitle>
+                      <CardTitle className="text-card-foreground">{wrestler.name}</CardTitle>
                       <div className="flex flex-wrap gap-1 mt-1">
                         {wrestler.promotions.map((p) => (
                           <span key={p.value} className="bg-primary/20 text-primary-foreground px-2 py-0.5 rounded text-xs border border-primary/30">{p.label}</span>
@@ -370,8 +370,7 @@ export default function Home() {
                       </div>
                     </div>
                   </CardHeader>
-                  <CardContent>
-                    <div className="text-muted-foreground text-sm mb-2">Short bio or associations here.</div>
+                  <CardContent className="px-6">
                     <div className="flex gap-2">
                       <Button size="sm" variant="outline"
                         onClick={() => {
@@ -418,8 +417,8 @@ export default function Home() {
                   <DialogTitle>Create New Promotion</DialogTitle>
                 </DialogHeader>
                 <form className="flex flex-col gap-4 mt-2 w-full">
-                  <Input placeholder="Name" className="w-full" value={promoName} onChange={e => setPromoName(e.target.value)} />
                   <PromotionImageDropzone value={promoImage} onChange={setPromoImage} />
+                  <Input placeholder="Name" className="w-full" value={promoName} onChange={e => setPromoName(e.target.value)} />
                   <DialogFooter>
                     <Button type="button" variant="outline" onClick={() => setPromoOpen(false)}>Cancel</Button>
                     <Button type="submit">Save</Button>
@@ -441,7 +440,6 @@ export default function Home() {
                     </div>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-muted-foreground text-sm mb-2">Short description or details here.</div>
                     <div className="flex gap-2">
                       <Button size="sm" variant="outline"
                         onClick={() => {
@@ -471,8 +469,8 @@ export default function Home() {
                   <DialogTitle>Edit Promotion</DialogTitle>
                 </DialogHeader>
                 <form className="flex flex-col gap-4 mt-2 w-full">
-                  <Input placeholder="Name" className="w-full" value={editPromoName} onChange={e => setEditPromoName(e.target.value)} />
                   <PromotionImageDropzone value={editPromoImage} onChange={setEditPromoImage} />
+                  <Input placeholder="Name" className="w-full" value={editPromoName} onChange={e => setEditPromoName(e.target.value)} />
                   <DialogFooter>
                     <Button type="button" variant="outline" onClick={() => setEditPromoOpen(false)}>Cancel</Button>
                     <Button type="submit">Save</Button>
@@ -501,8 +499,8 @@ export default function Home() {
                   <DialogTitle>Create New Faction</DialogTitle>
                 </DialogHeader>
                 <form className="flex flex-col gap-4 mt-2 w-full">
-                  <Input placeholder="Name" className="w-full" value={factionName} onChange={e => setFactionName(e.target.value)} />
                   <FactionImageDropzone value={factionImage} onChange={setFactionImage} />
+                  <Input placeholder="Name" className="w-full" value={factionName} onChange={e => setFactionName(e.target.value)} />
                   <DialogFooter>
                     <Button type="button" variant="outline" onClick={() => setFactionOpen(false)}>Cancel</Button>
                     <Button type="submit">Save</Button>
@@ -524,7 +522,6 @@ export default function Home() {
                     </div>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-muted-foreground text-sm mb-2">Short description or details here.</div>
                     <div className="flex gap-2">
                       <Button size="sm" variant="outline"
                         onClick={() => {
@@ -554,8 +551,8 @@ export default function Home() {
                   <DialogTitle>Edit Faction</DialogTitle>
                 </DialogHeader>
                 <form className="flex flex-col gap-4 mt-2 w-full">
-                  <Input placeholder="Name" className="w-full" value={editFactionName} onChange={e => setEditFactionName(e.target.value)} />
                   <FactionImageDropzone value={editFactionImage} onChange={setEditFactionImage} />
+                  <Input placeholder="Name" className="w-full" value={editFactionName} onChange={e => setEditFactionName(e.target.value)} />
                   <DialogFooter>
                     <Button type="button" variant="outline" onClick={() => setEditFactionOpen(false)}>Cancel</Button>
                     <Button type="submit">Save</Button>
@@ -584,8 +581,8 @@ export default function Home() {
                   <DialogTitle>Create New Championship</DialogTitle>
                 </DialogHeader>
                 <form className="flex flex-col gap-4 mt-2 w-full">
-                  <Input placeholder="Name" className="w-full" value={champName} onChange={e => setChampName(e.target.value)} />
                   <ChampionshipImageDropzone value={champImage} onChange={setChampImage} />
+                  <Input placeholder="Name" className="w-full" value={champName} onChange={e => setChampName(e.target.value)} />
                   <DialogFooter>
                     <Button type="button" variant="outline" onClick={() => setChampOpen(false)}>Cancel</Button>
                     <Button type="submit">Save</Button>
@@ -607,7 +604,6 @@ export default function Home() {
                     </div>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-muted-foreground text-sm mb-2">Short description or details here.</div>
                     <div className="flex gap-2">
                       <Button size="sm" variant="outline"
                         onClick={() => {
@@ -637,8 +633,8 @@ export default function Home() {
                   <DialogTitle>Edit Championship</DialogTitle>
                 </DialogHeader>
                 <form className="flex flex-col gap-4 mt-2 w-full">
-                  <Input placeholder="Name" className="w-full" value={editChampName} onChange={e => setEditChampName(e.target.value)} />
                   <ChampionshipImageDropzone value={editChampImage} onChange={setEditChampImage} />
+                  <Input placeholder="Name" className="w-full" value={editChampName} onChange={e => setEditChampName(e.target.value)} />
                   <DialogFooter>
                     <Button type="button" variant="outline" onClick={() => setEditChampOpen(false)}>Cancel</Button>
                     <Button type="submit">Save</Button>
