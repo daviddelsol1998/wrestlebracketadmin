@@ -10,7 +10,7 @@ import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, Dialog
 import { useCallback, useState, useEffect } from "react";
 import { useDropzone } from "react-dropzone";
 import CreatableSelect from "react-select/creatable";
-import type { MultiValue } from "react-select";
+import type { MultiValue, ValueContainerProps } from "react-select";
 import { fetchWrestlersWithPromotions, createWrestlerWithPromotions, updateWrestlerWithPromotions, deleteWrestler, uploadWrestlerImage, Wrestler, OptionType, PromotionRef } from "@/lib/wrestlers";
 import { getPromotionsWithWrestlerCount, createPromotion, updatePromotion, deletePromotion, uploadPromotionImage, Promotion } from "@/lib/promotions";
 
@@ -90,6 +90,23 @@ function promotionRefsToOptions(promos: { id: string; name: string }[] = []): Op
 function optionsToPromotionIds(options: OptionType[]): string[] {
   return options.map(o => o.value);
 }
+
+// Custom ValueContainer for promotion filter
+const PromotionValueContainer = (props: ValueContainerProps<OptionType, true>) => {
+  const { getValue, selectProps } = props;
+  const selected = getValue();
+  const label = selectProps.placeholder || "Promotions";
+  if (selected.length === 0) {
+    return <div className="px-1 text-muted-foreground">{label}</div>;
+  }
+  // Show up to 2 selected names, then ellipsis if more
+  const names = selected.map(s => s.label);
+  let display = names.slice(0, 2).join(", ");
+  if (names.length > 2) display += ", ...";
+  return (
+    <div className="px-1 truncate text-card-foreground">{display}</div>
+  );
+};
 
 export default function Home() {
   const [open, setOpen] = useState(false);
@@ -227,6 +244,12 @@ export default function Home() {
     singleValue: (base: any) => ({ ...base, color: isDark ? '#fff' : '#18181b' }),
     placeholder: (base: any) => ({ ...base, color: isDark ? '#a1a1aa' : '#6b7280' }),
   };
+
+  // Add state for promotion filter
+  const [promotionFilter, setPromotionFilter] = useState<string[]>([]);
+
+  // Add state for wrestler search filter
+  const [wrestlerSearch, setWrestlerSearch] = useState("");
 
   // Fetch wrestlers on mount
   useEffect(() => {
@@ -451,40 +474,60 @@ export default function Home() {
               <div className="text-center text-destructive py-4">{wrestlersError}</div>
             )}
             <div className="flex flex-col gap-4 mb-8 md:flex-row md:items-end md:gap-6">
-              <div className="flex-1">
-                <Input placeholder="Search wrestlers by name..." className="w-full" />
+              <div className="flex-1 flex flex-col">
+                <label className="text-xs font-medium text-muted-foreground mb-1">Search</label>
+                <Input
+                  placeholder="Search wrestlers by name..."
+                  className="w-full"
+                  value={wrestlerSearch}
+                  onChange={e => setWrestlerSearch(e.target.value)}
+                />
               </div>
               <div className="flex flex-col gap-2 md:flex-row md:gap-4">
-                <Select>
-                  <SelectTrigger className="w-48">
-                    <SelectValue placeholder="Promotions" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="wwe">WWE</SelectItem>
-                    <SelectItem value="aew">AEW</SelectItem>
-                    <SelectItem value="njpw">NJPW</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Select>
-                  <SelectTrigger className="w-48">
-                    <SelectValue placeholder="Factions" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="bulletclub">Bullet Club</SelectItem>
-                    <SelectItem value="bloodline">The Bloodline</SelectItem>
-                    <SelectItem value="chaos">CHAOS</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Select>
-                  <SelectTrigger className="w-48">
-                    <SelectValue placeholder="Championships" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="world">World Championship</SelectItem>
-                    <SelectItem value="tag">Tag Team Championship</SelectItem>
-                    <SelectItem value="intercontinental">Intercontinental</SelectItem>
-                  </SelectContent>
-                </Select>
+                <div className="flex flex-col w-48">
+                  <label className="text-xs font-medium text-muted-foreground mb-1">Promotions</label>
+                  <CreatableSelect
+                    isMulti
+                    styles={selectStyles}
+                    classNamePrefix="react-select"
+                    placeholder=""
+                    value={promotionsList
+                      .filter(p => promotionFilter.includes(p.id))
+                      .map(p => ({ value: p.id, label: p.name }))}
+                    onChange={(newValue) =>
+                      setPromotionFilter((newValue as OptionType[]).map(o => o.value))
+                    }
+                    options={promotionsList.map(p => ({ value: p.id, label: p.name }))}
+                    isClearable
+                    components={{ ValueContainer: PromotionValueContainer }}
+                  />
+                </div>
+                <div className="flex flex-col w-48">
+                  <label className="text-xs font-medium text-muted-foreground mb-1">Factions</label>
+                  <Select>
+                    <SelectTrigger className="w-48">
+                      <SelectValue placeholder="" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="bulletclub">Bullet Club</SelectItem>
+                      <SelectItem value="bloodline">The Bloodline</SelectItem>
+                      <SelectItem value="chaos">CHAOS</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex flex-col w-48">
+                  <label className="text-xs font-medium text-muted-foreground mb-1">Championships</label>
+                  <Select>
+                    <SelectTrigger className="w-48">
+                      <SelectValue placeholder="" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="world">World Championship</SelectItem>
+                      <SelectItem value="tag">Tag Team Championship</SelectItem>
+                      <SelectItem value="intercontinental">Intercontinental</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </div>
             <Dialog open={open} onOpenChange={setOpen}>
@@ -556,58 +599,68 @@ export default function Home() {
               </DialogContent>
             </Dialog>
             <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-              {wrestlers.map((wrestler) => (
-                <Card key={wrestler.id} className="bg-card text-card-foreground border border-border shadow-sm flex flex-col gap-6 rounded-xl py-6">
-                  <CardHeader className="flex flex-row items-center gap-4 px-6">
-                    <img
-                      src={wrestler.image_url || "https://placehold.co/80x80/png"}
-                      alt={wrestler.name}
-                      className="w-20 h-20 rounded-full object-cover border border-border bg-muted"
-                    />
-                    <div>
-                      <CardTitle className="text-card-foreground">{wrestler.name}</CardTitle>
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        {(wrestler.promotions ?? []).map((p: PromotionRef) => (
-                          <span key={p.id} className="bg-primary/20 text-primary-foreground px-2 py-0.5 rounded text-xs border border-primary/30">
-                            {p.name}
-                          </span>
-                        ))}
-                        {(wrestler.factions ?? []).map((f) => (
-                          <span key={f.value} className="bg-secondary/20 text-secondary-foreground px-2 py-0.5 rounded text-xs border border-secondary/30">{f.label}</span>
-                        ))}
-                        {(wrestler.championships ?? []).map((c) => (
-                          <span key={c.value} className="bg-accent/20 text-accent-foreground px-2 py-0.5 rounded text-xs border border-accent/30">{c.label}</span>
-                        ))}
+              {wrestlers
+                .filter(wrestler =>
+                  // Filter by search string
+                  wrestler.name.toLowerCase().includes(wrestlerSearch.trim().toLowerCase())
+                )
+                .filter(wrestler =>
+                  // Filter by promotions
+                  promotionFilter.length === 0 ||
+                  (wrestler.promotions ?? []).some(p => promotionFilter.includes(p.id))
+                )
+                .map((wrestler) => (
+                  <Card key={wrestler.id} className="bg-card text-card-foreground border border-border shadow-sm flex flex-col gap-6 rounded-xl py-6">
+                    <CardHeader className="flex flex-row items-center gap-4 px-6">
+                      <img
+                        src={wrestler.image_url || "https://placehold.co/80x80/png"}
+                        alt={wrestler.name}
+                        className="w-20 h-20 rounded-full object-cover border border-border bg-muted"
+                      />
+                      <div>
+                        <CardTitle className="text-card-foreground">{wrestler.name}</CardTitle>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {(wrestler.promotions ?? []).map((p: PromotionRef) => (
+                            <span key={p.id} className="bg-primary/20 text-primary-foreground px-2 py-0.5 rounded text-xs border border-primary/30">
+                              {p.name}
+                            </span>
+                          ))}
+                          {(wrestler.factions ?? []).map((f) => (
+                            <span key={f.value} className="bg-secondary/20 text-secondary-foreground px-2 py-0.5 rounded text-xs border border-secondary/30">{f.label}</span>
+                          ))}
+                          {(wrestler.championships ?? []).map((c) => (
+                            <span key={c.value} className="bg-accent/20 text-accent-foreground px-2 py-0.5 rounded text-xs border border-accent/30">{c.label}</span>
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="px-6">
-                    <div className="flex gap-2">
-                      <Button size="sm" variant="outline"
-                        onClick={() => {
-                          setEditWrestlerName(wrestler.name);
-                          setEditWrestlerImage(null);
-                          setEditWrestlerPromotions(promotionRefsToOptions(wrestler.promotions ?? []));
-                          setEditWrestlerFactions(wrestler.factions ?? []);
-                          setEditWrestlerChampionships(wrestler.championships ?? []);
-                          setEditWrestlerId(wrestler.id);
-                          setEditWrestlerOpen(true);
-                        }}>
-                        Edit
-                      </Button>
-                      <Button size="sm" variant="destructive"
-                        onClick={() => {
-                          setDeleteWrestlerId(wrestler.id);
-                          setDeleteEntityType("Wrestler");
-                          setDeleteEntityName(wrestler.name);
-                          setDeleteDialogOpen(true);
-                        }}>
-                        Delete
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+                    </CardHeader>
+                    <CardContent className="px-6">
+                      <div className="flex gap-2">
+                        <Button size="sm" variant="outline"
+                          onClick={() => {
+                            setEditWrestlerName(wrestler.name);
+                            setEditWrestlerImage(null);
+                            setEditWrestlerPromotions(promotionRefsToOptions(wrestler.promotions ?? []));
+                            setEditWrestlerFactions(wrestler.factions ?? []);
+                            setEditWrestlerChampionships(wrestler.championships ?? []);
+                            setEditWrestlerId(wrestler.id);
+                            setEditWrestlerOpen(true);
+                          }}>
+                          Edit
+                        </Button>
+                        <Button size="sm" variant="destructive"
+                          onClick={() => {
+                            setDeleteWrestlerId(wrestler.id);
+                            setDeleteEntityType("Wrestler");
+                            setDeleteEntityName(wrestler.name);
+                            setDeleteDialogOpen(true);
+                          }}>
+                          Delete
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
             </div>
           </TabsContent>
           <TabsContent value="promotions">
