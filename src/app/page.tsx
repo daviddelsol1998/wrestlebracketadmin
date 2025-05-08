@@ -609,7 +609,6 @@ export default function Home() {
                 </Card>
               ))}
             </div>
-            <div className="text-center text-muted-foreground py-12">Wrestlers tab content goes here.</div>
           </TabsContent>
           <TabsContent value="promotions">
             <div className="flex flex-col gap-4 mb-8 md:flex-row md:items-end md:gap-6">
@@ -716,7 +715,6 @@ export default function Home() {
                 </form>
               </DialogContent>
             </Dialog>
-            <div className="text-center text-muted-foreground py-12">Promotions tab content goes here.</div>
           </TabsContent>
           <TabsContent value="factions">
             <div className="flex flex-col gap-4 mb-8 md:flex-row md:items-end md:gap-6">
@@ -798,7 +796,6 @@ export default function Home() {
                 </form>
               </DialogContent>
             </Dialog>
-            <div className="text-center text-muted-foreground py-12">Factions tab content goes here.</div>
           </TabsContent>
           <TabsContent value="championships">
             <div className="flex flex-col gap-4 mb-8 md:flex-row md:items-end md:gap-6">
@@ -880,7 +877,6 @@ export default function Home() {
                 </form>
               </DialogContent>
             </Dialog>
-            <div className="text-center text-muted-foreground py-12">Championships tab content goes here.</div>
           </TabsContent>
         </Tabs>
       </main>
